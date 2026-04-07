@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1a5a2a">
+<meta name="description" content="ViperDash — a fast-paced grid arcade game. Easy mode with wall wrap and 2-min rounds, or Hard mode where every wall is deadly and speed increases every 10 bites.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>ViperDash</title>
+<link rel="manifest" href="manifest.json">
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+html, body { height:100%; overflow-x:hidden; }
+body {
+  background:#ddeae2; font-family:monospace;
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:flex-start; min-height:100vh; padding:20px 16px 40px;
+  -webkit-tap-highlight-color:transparent;
+}
+canvas { display:block; cursor:default; touch-action:none; }
+.btn {
+  font-family:monospace; font-size:11px; letter-spacing:2px;
+  background:transparent; border:2px solid #2a7a4a; color:#2a7a4a;
+  padding:11px 24px; cursor:pointer; text-transform:uppercase;
+  transition:all .15s; border-radius:5px;
+}
+.btn:hover  { background:#2a7a4a18; }
+.btn.red    { border-color:#c0293a; color:#c0293a; }
+.btn.red:hover  { background:#c0293a15; }
+.btn.gold   { border-color:#a07800; color:#a07800; }
+.btn.gold:hover { background:#a0780015; }
+.ni {
+  background:#fff; border:2px solid #aaccbb; border-radius:5px;
+  color:#1a4a2a; font-family:monospace; font-size:22px;
+  text-align:center; outline:none; padding:11px 0; width:100%; letter-spacing:3px;
+}
+.ni::placeholder { color:#aaccbb; }
+.ni:focus { border-color:#2a7a4a; box-shadow:0 0 0 3px #2a7a4a22; }
+.hud { display:flex; justify-content:space-between; align-items:center; margin-bottom:9px; }
+.stat { text-align:center; }
+.stat-label { font-size:9px; color:#6a9a7a; letter-spacing:2px; margin-bottom:2px; }
+.stat-val   { font-size:18px; font-weight:bold; }
+@keyframes pop    { from{opacity:0;transform:scale(.88)} to{opacity:1;transform:scale(1)} }
+@keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+@keyframes newrow  { from{background:#ffe8a0} to{background:#eaf5ee} }
+.anim    { animation:pop .3s ease; }
+.slideup { animation:slideUp .35s ease; }
+.panel {
+  border:2px solid #c8ddd2; background:#fff; padding:28px 28px;
+  text-align:center; border-radius:10px; box-shadow:0 3px 20px #00000014;
+}
+.title { font-size:clamp(28px,5vw,44px); font-weight:bold; color:#1a5a2a; letter-spacing:5px; margin-bottom:2px; }
+.tagline { font-size:10px; color:#6a9a7a; letter-spacing:3px; margin-bottom:28px; }
+.err   { font-size:9px; color:#c0293a; margin-top:8px; letter-spacing:1px; min-height:14px; }
+.mode-row { display:flex; gap:10px; margin-top:14px; }
+.mode-btn {
+  flex:1; padding:14px 8px; border-radius:8px; border:2px solid #c8ddd2;
+  cursor:pointer; font-family:monospace; text-align:center;
+  transition:all .18s; background:#f8fbf9;
+}
+.mode-btn .mode-icon { font-size:22px; display:block; margin-bottom:5px; }
+.mode-btn .mode-name { font-size:11px; letter-spacing:2px; font-weight:bold; display:block; }
+.mode-btn .mode-desc { font-size:9px; color:#6a9a7a; letter-spacing:1px; margin-top:4px; display:block; line-height:1.5; }
+.mode-btn.easy { border-color:#2a7a4a; background:#edf7f1; }
+.mode-btn.easy .mode-name { color:#1a5a2a; }
+.mode-btn.hard-mode { border-color:#8b1a1a; background:#fdf0f0; }
+.mode-btn.hard-mode .mode-name { color:#8b1a1a; }
+.mode-btn.selected-easy { background:#d4f0e0; border-color:#2a7a4a; box-shadow:0 0 0 3px #2a7a4a33; }
+.mode-btn.selected-hard { background:#f5d4d4; border-color:#8b1a1a; box-shadow:0 0 0 3px #8b1a1a33; }
+.mode-badge {
+  display:inline-block; padding:3px 10px; border-radius:4px;
+  font-size:9px; letter-spacing:2px; font-weight:bold; margin-bottom:10px;
+}
+.mode-badge.easy { background:#d4f0e0; color:#1a5a2a; border:1px solid #2a7a4a66; }
+.mode-badge.hard { background:#f5d4d4; color:#8b1a1a; border:1px solid #8b1a1a66; }
+.lb-tabs { display:flex; border-radius:8px 8px 0 0; overflow:hidden; border:2px solid #c8ddd2; border-bottom:none; width:100%; }
+.lb-tab {
+  flex:1; padding:10px; text-align:center; cursor:pointer;
+  font-family:monospace; font-size:10px; letter-spacing:2px; border:none; font-weight:bold;
+}
+.lb-tab.easy-tab { background:#edf7f1; color:#2a7a4a; }
+.lb-tab.easy-tab.active { background:#2a7a4a; color:#fff; }
+.lb-tab.hard-tab { background:#fdf0f0; color:#8b1a1a; }
+.lb-tab.hard-tab.active { background:#8b1a1a; color:#fff; }
+.lb-wrap { width:100%; background:#fff; border:2px solid #c8ddd2; border-top:none; border-radius:0 0 10px 10px; overflow:hidden; box-shadow:0 3px 20px #00000014; margin-bottom:18px; }
+.lb-table { width:100%; border-collapse:collapse; }
+.lb-table th { font-size:9px; color:#6a9a7a; letter-spacing:2px; text-transform:uppercase; padding:8px 12px; background:#f0f5f2; border-bottom:2px solid #c8ddd2; text-align:left; }
+.lb-table th.r { text-align:right; }
+.lb-table td { padding:10px 12px; border-bottom:1px solid #e4eeea; font-size:13px; vertical-align:middle; }
+.lb-table td.r { text-align:right; }
+.lb-table tr.me td { background:#eaf5ee; }
+.lb-table tr.me td:first-child { border-left:4px solid #2a7a4a; }
+.lb-table tr.me-hard td { background:#fdf0f0; }
+.lb-table tr.me-hard td:first-child { border-left:4px solid #8b1a1a; }
+.lb-table tr.new-entry td { animation:newrow 2s ease forwards; }
+.rank-gold   { color:#a07800; font-weight:bold; font-size:15px; }
+.rank-silver { color:#777;    font-weight:bold; font-size:15px; }
+.rank-bronze { color:#99622a; font-weight:bold; font-size:15px; }
+.rank-num    { color:#6a9a7a; font-weight:bold; }
+.result-banner { display:flex; border-radius:8px; overflow:hidden; border:2px solid #c8ddd2; margin-bottom:14px; width:100%; }
+.result-cell { flex:1; padding:14px 8px; text-align:center; border-right:1px solid #c8ddd2; background:#fff; }
+.result-cell:last-child { border-right:none; }
+.result-cell .rc-label { font-size:8px; color:#6a9a7a; letter-spacing:2px; margin-bottom:5px; }
+.result-cell .rc-val   { font-size:20px; font-weight:bold; }
+.result-cell.hl { background:#f0faf4; }
+.timer-wrap { height:8px; background:#c8ddd2; margin-bottom:9px; border-radius:4px; overflow:hidden; }
+.timer-bar  { height:100%; background:#2a7a4a; transition:width .5s linear,background .5s; border-radius:4px; width:100%; }
+.dp { display:grid; grid-template-columns:50px 50px 50px; grid-template-rows:50px 50px 50px; gap:5px; margin-top:14px; }
+.dp-btn {
+  background:#fff; border:2px solid #c8ddd2; color:#2a7a4a;
+  font-size:18px; cursor:pointer; display:flex; align-items:center;
+  justify-content:center; border-radius:7px; transition:background .1s;
+  user-select:none; -webkit-tap-highlight-color:transparent;
+}
+.dp-btn:active { background:#2a7a4a22; border-color:#2a7a4a; }
+.screen { display:none; flex-direction:column; align-items:center; }
+.screen.active { display:flex; }
+.disclaimer {
+  font-size:9px; color:#aaccbb; text-align:center; margin-top:14px;
+  max-width:420px; line-height:1.6; letter-spacing:0.5px;
+}
+</style>
+</head>
+<body>
+
+<!-- ══ ENTRY ═════════════════════════════════════════════════════════════ -->
+<div id="scr-entry" class="screen active anim" style="width:100%;max-width:520px;">
+  <div class="title" style="margin-top:16px;">VIPER<span style="color:#c0293a">DASH</span></div>
+  <div class="tagline">EASY &amp; HARD MODE &middot; LEADERBOARD</div>
+
+  <div class="panel" style="width:100%;">
+    <div style="font-size:10px;color:#6a9a7a;letter-spacing:2px;margin-bottom:14px;">ENTER YOUR NAME</div>
+    <input class="ni" id="name-input" placeholder="PLAYER ONE" maxlength="16" autocomplete="off"/>
+    <div class="err" id="name-err"></div>
+
+    <div style="font-size:10px;color:#6a9a7a;letter-spacing:2px;margin-top:18px;margin-bottom:2px;">SELECT MODE</div>
+    <div class="mode-row">
+      <button class="mode-btn easy selected-easy" id="btn-easy" onclick="selectMode('easy')">
+        <span class="mode-icon">🟢</span>
+        <span class="mode-name">EASY</span>
+        <span class="mode-desc">Wall wrap · 2-min timer<br>Score as much as you can</span>
+      </button>
+      <button class="mode-btn hard-mode" id="btn-hard" onclick="selectMode('hard')">
+        <span class="mode-icon">🔴</span>
+        <span class="mode-name">HARD</span>
+        <span class="mode-desc">No timer · Hit wall = game over<br>Speed up every 10 bites</span>
+      </button>
+    </div>
+
+    <button class="btn" id="play-btn" onclick="doStart()" style="width:100%;margin-top:18px;">&#9654; PLAY NOW</button>
+    <button class="btn gold" id="lb-btn-entry" onclick="showStandaloneLb()" style="width:100%;margin-top:11px;display:none;">&#127942; VIEW LEADERBOARD</button>
+  </div>
+
+  <div class="disclaimer">
+    ViperDash is an original game created independently. This game is not affiliated with, endorsed by, or connected to Nokia Corporation or any other entity. The grid-based movement genre is in the public domain. &copy; 2025 ViperDash. All rights reserved.
+  </div>
+  <div style="margin-top:10px;font-size:10px;color:#aaccbb;letter-spacing:2px;">ARROW KEYS &middot; WASD &middot; SWIPE &middot; D-PAD</div>
+</div>
+
+<!-- ══ GAME ══════════════════════════════════════════════════════════════ -->
+<div id="scr-game" class="screen">
+  <div class="hud" id="hud">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div id="hud-name" style="font-size:9px;color:#6a9a7a;letter-spacing:1px;"></div>
+      <div id="hud-mode-badge" class="mode-badge easy">EASY</div>
+    </div>
+    <div style="display:flex;gap:22px;">
+      <div class="stat"><div class="stat-label">SCORE</div><div class="stat-val" id="disp-score" style="color:#1a5a2a;">0</div></div>
+      <div class="stat"><div class="stat-label">BEST</div><div class="stat-val" id="disp-best" style="color:#a07800;">0</div></div>
+      <div class="stat" id="hud-time-stat"><div class="stat-label">TIME</div><div class="stat-val" id="disp-time" style="color:#2255cc;">2:00</div></div>
+      <div class="stat" id="hud-speed-stat" style="display:none;"><div class="stat-label">SPEED</div><div class="stat-val" id="disp-speed" style="color:#8b1a1a;">1</div></div>
+      <div class="stat" id="hud-bites-stat" style="display:none;"><div class="stat-label">BITES</div><div class="stat-val" id="disp-bites" style="color:#8b1a1a;">0</div></div>
+    </div>
+  </div>
+  <div class="timer-wrap" id="timer-wrap"><div class="timer-bar" id="timer-bar"></div></div>
+  <canvas id="canvas" style="border-radius:5px;box-shadow:0 3px 20px #00000022;"></canvas>
+  <div class="dp">
+    <div></div>
+    <button class="dp-btn" onclick="move('UP')">&#9650;</button>
+    <div></div>
+    <button class="dp-btn" onclick="move('LEFT')">&#9668;</button>
+    <div style="background:#f0f5f2;border:2px solid #c8ddd2;border-radius:7px;display:flex;align-items:center;justify-content:center;"><div style="width:8px;height:8px;border-radius:50%;background:#c8ddd2;"></div></div>
+    <button class="dp-btn" onclick="move('RIGHT')">&#9658;</button>
+    <div></div>
+    <button class="dp-btn" onclick="move('DOWN')">&#9660;</button>
+    <div></div>
+  </div>
+  <div style="margin-top:10px;font-size:9px;color:#aaccbb;letter-spacing:2px;">ESC = QUIT &nbsp;&middot;&nbsp; ARROW KEYS / WASD</div>
+</div>
+
+<!-- ══ RESULTS ════════════════════════════════════════════════════════════ -->
+<div id="scr-over" class="screen slideup" style="width:100%;max-width:680px;">
+  <div style="text-align:center;margin-top:16px;margin-bottom:6px;">
+    <div id="over-badge" class="mode-badge easy" style="margin-bottom:10px;">EASY MODE</div>
+    <div id="over-headline" style="font-size:clamp(20px,4vw,32px);font-weight:bold;color:#c0293a;letter-spacing:4px;">TIME'S UP!</div>
+    <div id="over-subline" style="font-size:10px;color:#6a9a7a;letter-spacing:3px;margin-top:3px;"></div>
+  </div>
+  <div id="new-record-badge" style="display:none;margin-bottom:10px;padding:8px 22px;background:#fff8e0;border:2px solid #e8c000;border-radius:6px;font-size:11px;letter-spacing:2px;color:#a07800;font-weight:bold;"></div>
+  <div class="result-banner">
+    <div class="result-cell hl"><div class="rc-label">THIS GAME</div><div class="rc-val" id="rc-score" style="color:#c0293a;">0</div></div>
+    <div class="result-cell"><div class="rc-label">PERSONAL BEST</div><div class="rc-val" id="rc-best" style="color:#a07800;">0</div></div>
+    <div class="result-cell"><div class="rc-label">FOOD EATEN</div><div class="rc-val" id="rc-food" style="color:#6633aa;">0</div></div>
+    <div class="result-cell"><div class="rc-label" id="rc-extra-label">GAMES PLAYED</div><div class="rc-val" id="rc-extra-val" style="color:#2255cc;">0</div></div>
+  </div>
+  <div style="width:100%;">
+    <div class="lb-tabs">
+      <button class="lb-tab easy-tab" id="tab-easy" onclick="switchTab('easy')">🟢 EASY</button>
+      <button class="lb-tab hard-tab" id="tab-hard" onclick="switchTab('hard')">🔴 HARD</button>
+    </div>
+    <div class="lb-wrap">
+      <div id="lb-easy-panel">
+        <table class="lb-table"><thead><tr><th style="width:36px;">#</th><th>NAME</th><th class="r">SCORE</th><th class="r">GAMES</th><th class="r">BEST</th><th class="r">DATE</th></tr></thead><tbody id="lb-easy-body"></tbody></table>
+        <div id="lb-easy-empty" style="display:none;padding:20px;text-align:center;font-size:10px;color:#aaccbb;letter-spacing:2px;">NO EASY SCORES YET</div>
+      </div>
+      <div id="lb-hard-panel" style="display:none;">
+        <table class="lb-table"><thead><tr><th style="width:36px;">#</th><th>NAME</th><th class="r">SCORE</th><th class="r">GAMES</th><th class="r">BEST</th><th class="r">DATE</th></tr></thead><tbody id="lb-hard-body"></tbody></table>
+        <div id="lb-hard-empty" style="display:none;padding:20px;text-align:center;font-size:10px;color:#aaccbb;letter-spacing:2px;">NO HARD SCORES YET</div>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:8px;">
+    <button class="btn" id="over-play-again" onclick="replay()" style="min-width:180px;">&#9654; PLAY AGAIN</button>
+    <button class="btn red" onclick="goEntry()" style="min-width:180px;">CHANGE PLAYER</button>
+  </div>
+  <button class="btn" onclick="clearLb()" style="font-size:9px;border-color:#aaccbb;color:#aaccbb;padding:7px 18px;margin-top:2px;">CLEAR ALL SCORES</button>
+</div>
+
+<!-- ══ STANDALONE LEADERBOARD ════════════════════════════════════════════ -->
+<div id="scr-lb" class="screen anim" style="width:100%;max-width:680px;">
+  <div style="text-align:center;margin-top:16px;margin-bottom:14px;">
+    <div class="title" style="font-size:20px;">&#127942; LEADERBOARD</div>
+    <div class="tagline" style="margin-bottom:0;">TOP 10 PER MODE &middot; THIS DEVICE</div>
+  </div>
+  <div style="width:100%;">
+    <div class="lb-tabs">
+      <button class="lb-tab easy-tab" id="stab-easy" onclick="switchStandaloneTab('easy')">🟢 EASY</button>
+      <button class="lb-tab hard-tab" id="stab-hard" onclick="switchStandaloneTab('hard')">🔴 HARD</button>
+    </div>
+    <div class="lb-wrap">
+      <div id="slb-easy-panel">
+        <table class="lb-table"><thead><tr><th style="width:36px;">#</th><th>NAME</th><th class="r">SCORE</th><th class="r">GAMES</th><th class="r">BEST</th><th class="r">DATE</th></tr></thead><tbody id="slb-easy-body"></tbody></table>
+        <div id="slb-easy-empty" style="display:none;padding:20px;text-align:center;font-size:10px;color:#aaccbb;letter-spacing:2px;">NO EASY SCORES YET</div>
+      </div>
+      <div id="slb-hard-panel" style="display:none;">
+        <table class="lb-table"><thead><tr><th style="width:36px;">#</th><th>NAME</th><th class="r">SCORE</th><th class="r">GAMES</th><th class="r">BEST</th><th class="r">DATE</th></tr></thead><tbody id="slb-hard-body"></tbody></table>
+        <div id="slb-hard-empty" style="display:none;padding:20px;text-align:center;font-size:10px;color:#aaccbb;letter-spacing:2px;">NO HARD SCORES YET</div>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+    <button class="btn" onclick="showScreen('entry')" style="min-width:140px;">&#8592; BACK</button>
+    <button class="btn gold" onclick="doStartFromLb()" style="min-width:140px;">&#9654; PLAY</button>
+    <button class="btn" onclick="clearLb()" style="font-size:9px;border-color:#aaccbb;color:#aaccbb;padding:11px 18px;">CLEAR ALL</button>
+  </div>
+</div>
+
+<!-- ══ PRIVACY POLICY (required by Google Play) ══════════════════════════ -->
+<div id="scr-privacy" class="screen anim" style="width:100%;max-width:540px;">
+  <div class="panel" style="width:100%;text-align:left;margin-top:16px;">
+    <div style="font-size:16px;font-weight:bold;color:#1a5a2a;letter-spacing:2px;margin-bottom:16px;">PRIVACY POLICY</div>
+    <div style="font-size:12px;color:#334433;line-height:1.8;">
+      <p><strong>ViperDash</strong> does not collect, transmit, or share any personal data.</p>
+      <br>
+      <p>All player names and scores are stored exclusively on your device using the browser's localStorage API. This data never leaves your device and is not accessible to the developer or any third party.</p>
+      <br>
+      <p>ViperDash does not use analytics, advertising SDKs, crash reporting tools, or any third-party services. No internet connection is required to play.</p>
+      <br>
+      <p>You can delete all stored data at any time by pressing the "Clear All Scores" button within the app.</p>
+      <br>
+      <p style="color:#6a9a7a;font-size:11px;">Last updated: 2025. Contact: [your email here]</p>
+    </div>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:14px;">
+    <button class="btn" onclick="showScreen('entry')">&#8592; BACK</button>
+  </div>
+</div>
+
+<!-- Privacy link in footer -->
+<div style="margin-top:20px;font-size:9px;color:#aaccbb;letter-spacing:1px;" id="footer-links">
+  <span onclick="showScreen('privacy')" style="cursor:pointer;text-decoration:underline;">Privacy Policy</span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════════
+const GRID      = 30;
+const CELL      = 26;
+const CW        = GRID * CELL;
+const ROUND_SEC = 120;
+const DB_KEY    = "viperdash_scores_v1";
+const MAX_ROWS  = 10;
+const HARD_BITES_PER_LEVEL = 10;
+const EASY_TICK_BASE = 160;
+const HARD_TICK_BASE = 180;
+const HARD_TICK_STEP = 8;
+
+const DIRS = { UP:[0,-1], DOWN:[0,1], LEFT:[-1,0], RIGHT:[1,0] };
+const OPP  = { UP:"DOWN", DOWN:"UP", LEFT:"RIGHT", RIGHT:"LEFT" };
+
+const canvas = document.getElementById("canvas");
+canvas.width  = CW;
+canvas.height = CW;
+const ctx = canvas.getContext("2d");
+document.getElementById("hud").style.width        = CW + "px";
+document.getElementById("timer-wrap").style.width  = CW + "px";
+
+let gs = null, gameLoop = null, timerLoop = null, rafId = null;
+let currentScreen = "entry", playerName = "", selectedMode = "easy";
+
+// ═══════════════════════════════════════════════════════════════════════
+// MODE SELECTOR
+// ═══════════════════════════════════════════════════════════════════════
+function selectMode(m) {
+  selectedMode = m;
+  document.getElementById("btn-easy").className = "mode-btn easy" + (m==="easy"?" selected-easy":"");
+  document.getElementById("btn-hard").className = "mode-btn hard-mode" + (m==="hard"?" selected-hard":"");
+  const pb = document.getElementById("play-btn");
+  pb.style.borderColor = m==="hard" ? "#8b1a1a" : "#2a7a4a";
+  pb.style.color       = m==="hard" ? "#8b1a1a" : "#2a7a4a";
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// DATABASE — localStorage, device-only, no network
+// ═══════════════════════════════════════════════════════════════════════
+let db = { easy:[], hard:[] };
+
+function dbLoad() {
+  try { const r = localStorage.getItem(DB_KEY); if (r) db = JSON.parse(r); } catch {}
+  if (!db.easy) db.easy = [];
+  if (!db.hard) db.hard = [];
+}
+function dbSave() {
+  try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch {}
+}
+function dbRecord(mode, name, score) {
+  const list  = db[mode];
+  const key   = name.toLowerCase();
+  const today = new Date().toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" });
+  let entry   = list.find(e => e.name.toLowerCase() === key);
+  let isNew=false, isPB=false;
+  if (entry) {
+    entry.games++;
+    if (score > entry.best) { entry.best=score; isPB=true; entry.bestDate=today; }
+    entry.last=score; entry.lastDate=today;
+  } else {
+    entry = { name, score, games:1, best:score, bestDate:today, last:score, lastDate:today };
+    list.push(entry); isNew=true; isPB=true;
+  }
+  list.sort((a,b) => b.best - a.best);
+  db[mode] = list.slice(0, MAX_ROWS);
+  dbSave();
+  const rank = db[mode].findIndex(e => e.name.toLowerCase() === key) + 1;
+  return { rank: rank > 0 ? rank : null, isNew, isPB };
+}
+function dbGetEntry(mode, name) {
+  return db[mode].find(e => e.name.toLowerCase() === name.toLowerCase());
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// GAME HELPERS
+// ═══════════════════════════════════════════════════════════════════════
+function wrap(v) { return ((v % GRID) + GRID) % GRID; }
+function randFood(snake) {
+  let p;
+  do { p = [Math.floor(Math.random()*GRID), Math.floor(Math.random()*GRID)]; }
+  while (snake.some(s => s[0]===p[0] && s[1]===p[1]));
+  return p;
+}
+function initGs(mode) {
+  const s = [[15,15],[14,15],[13,15]];
+  return { snake:s, dir:"RIGHT", nd:"RIGHT", food:randFood(s),
+           score:0, alive:true, started:false, timeLeft:ROUND_SEC,
+           foodEaten:0, mode, speedLevel:1, bitesThisLevel:0 };
+}
+function tickInterval() {
+  if (!gs) return 160;
+  return gs.mode === "easy"
+    ? Math.max(65, EASY_TICK_BASE - Math.floor(gs.score/60)*14)
+    : Math.max(50, HARD_TICK_BASE - (gs.speedLevel-1)*HARD_TICK_STEP);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SCREENS
+// ═══════════════════════════════════════════════════════════════════════
+function showScreen(id) {
+  currentScreen = id;
+  document.querySelectorAll(".screen").forEach(el => {
+    el.classList.remove("active"); el.style.display = "none";
+  });
+  document.getElementById("footer-links").style.display = (id==="game") ? "none" : "block";
+  const el = document.getElementById("scr-"+id);
+  el.style.display = "flex"; el.classList.add("active");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// START FLOW
+// ═══════════════════════════════════════════════════════════════════════
+function doStart() {
+  const n = document.getElementById("name-input").value.trim().toUpperCase();
+  if (!n) { document.getElementById("name-err").textContent="Enter your name!"; return; }
+  playerName = n; document.getElementById("name-err").textContent = "";
+  startGame();
+}
+function doStartFromLb() {
+  const n = document.getElementById("name-input").value.trim().toUpperCase();
+  if (n) playerName = n;
+  if (!playerName) { showScreen("entry"); return; }
+  startGame();
+}
+function startGame() {
+  stopLoops(); gs = initGs(selectedMode);
+  const badge = document.getElementById("hud-mode-badge");
+  if (selectedMode === "easy") {
+    badge.textContent = "EASY"; badge.className = "mode-badge easy";
+    document.getElementById("hud-time-stat").style.display  = "";
+    document.getElementById("hud-speed-stat").style.display = "none";
+    document.getElementById("hud-bites-stat").style.display = "none";
+    document.getElementById("timer-wrap").style.display     = "";
+  } else {
+    badge.textContent = "HARD"; badge.className = "mode-badge hard";
+    document.getElementById("hud-time-stat").style.display  = "none";
+    document.getElementById("hud-speed-stat").style.display = "";
+    document.getElementById("hud-bites-stat").style.display = "";
+    document.getElementById("timer-wrap").style.display     = "none";
+  }
+  document.getElementById("hud-name").textContent  = playerName;
+  document.getElementById("hud").style.width       = CW + "px";
+  document.getElementById("timer-wrap").style.width = CW + "px";
+  const entry = dbGetEntry(selectedMode, playerName);
+  document.getElementById("disp-best").textContent  = entry ? entry.best : 0;
+  document.getElementById("disp-score").textContent = 0;
+  document.getElementById("disp-speed").textContent = 1;
+  document.getElementById("disp-bites").textContent = "0/"+HARD_BITES_PER_LEVEL;
+  updateTimeDisp();
+  showScreen("game"); drawFrame();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// LOOPS
+// ═══════════════════════════════════════════════════════════════════════
+function stopLoops() {
+  if (gameLoop)  { clearInterval(gameLoop);     gameLoop=null;  }
+  if (timerLoop) { clearInterval(timerLoop);    timerLoop=null; }
+  if (rafId)     { cancelAnimationFrame(rafId); rafId=null;     }
+}
+function beginLoops() {
+  if (gameLoop) clearInterval(gameLoop);
+  gameLoop = setInterval(tick, tickInterval());
+  if (gs.mode==="easy" && !timerLoop) timerLoop = setInterval(tickTimer, 1000);
+  startRaf();
+}
+function restartGameLoop() {
+  if (gameLoop) clearInterval(gameLoop);
+  gameLoop = setInterval(tick, tickInterval());
+}
+function startRaf() {
+  if (rafId) cancelAnimationFrame(rafId);
+  function frame() { drawFrame(); if (gs && gs.alive && gs.started) rafId = requestAnimationFrame(frame); }
+  rafId = requestAnimationFrame(frame);
+}
+function tickTimer() {
+  if (!gs||!gs.alive||!gs.started) return;
+  gs.timeLeft--; updateTimeDisp();
+  if (gs.timeLeft <= 0) endRound("TIME");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// GAME OVER
+// ═══════════════════════════════════════════════════════════════════════
+function endRound(reason) {
+  stopLoops(); gs.alive = false; drawFrame();
+  const result = dbRecord(gs.mode, playerName, gs.score);
+  const entry  = dbGetEntry(gs.mode, playerName);
+  const obadge = document.getElementById("over-badge");
+  obadge.textContent = gs.mode==="easy" ? "EASY MODE" : "HARD MODE";
+  obadge.className   = "mode-badge " + (gs.mode==="easy" ? "easy" : "hard");
+  const hl = document.getElementById("over-headline");
+  const sl = document.getElementById("over-subline");
+  if (reason==="WALL") {
+    hl.textContent = "WALL HIT!"; hl.style.color = "#8b1a1a";
+    sl.textContent = "SPEED LEVEL " + gs.speedLevel + " · " + gs.foodEaten + " BITES";
+  } else if (result.isPB && result.rank===1) {
+    hl.textContent = "NEW #1!"; hl.style.color = "#a07800";
+    sl.textContent = "TOP OF THE " + gs.mode.toUpperCase() + " BOARD";
+  } else if (result.isPB) {
+    hl.textContent = "PERSONAL BEST!"; hl.style.color = "#2a7a4a";
+    sl.textContent = result.rank ? "RANK #"+result.rank+" ("+gs.mode.toUpperCase()+")" : "";
+  } else {
+    hl.textContent = gs.mode==="easy" ? "TIME'S UP!" : "GAME OVER";
+    hl.style.color = gs.mode==="easy" ? "#c0293a" : "#8b1a1a";
+    sl.textContent = playerName + (result.rank ? " · RANK #"+result.rank : "");
+  }
+  const nb = document.getElementById("new-record-badge");
+  nb.style.display = (result.isPB && result.rank) ? "block" : "none";
+  if (result.rank && result.isPB)
+    nb.innerHTML = result.rank===1
+      ? "&#9733; NEW #1 "+gs.mode.toUpperCase()+" HIGH SCORE &#9733;"
+      : "&#9733; NEW PERSONAL BEST &mdash; RANK #"+result.rank+" &#9733;";
+  document.getElementById("rc-score").textContent = gs.score;
+  document.getElementById("rc-best").textContent  = entry ? entry.best : gs.score;
+  document.getElementById("rc-food").textContent  = gs.foodEaten;
+  if (gs.mode==="easy") {
+    document.getElementById("rc-extra-label").textContent = "GAMES PLAYED";
+    document.getElementById("rc-extra-val").textContent   = entry ? entry.games : 1;
+    document.getElementById("rc-extra-val").style.color   = "#2255cc";
+  } else {
+    document.getElementById("rc-extra-label").textContent = "MAX SPEED";
+    document.getElementById("rc-extra-val").textContent   = "LVL "+gs.speedLevel;
+    document.getElementById("rc-extra-val").style.color   = "#8b1a1a";
+  }
+  const pab = document.getElementById("over-play-again");
+  pab.style.borderColor = gs.mode==="hard" ? "#8b1a1a" : "#2a7a4a";
+  pab.style.color       = gs.mode==="hard" ? "#8b1a1a" : "#2a7a4a";
+  renderBothTabs("lb-easy-body","lb-easy-empty","lb-hard-body","lb-hard-empty");
+  switchTab(gs.mode);
+  setTimeout(() => showScreen("over"), 350);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// TICK
+// ═══════════════════════════════════════════════════════════════════════
+function tick() {
+  if (!gs||!gs.alive||!gs.started) return;
+  const d = DIRS[gs.nd];
+  let hx = gs.snake[0][0] + d[0];
+  let hy = gs.snake[0][1] + d[1];
+  if (gs.mode==="easy") { hx=wrap(hx); hy=wrap(hy); }
+  else { if (hx<0||hx>=GRID||hy<0||hy>=GRID) { endRound("WALL"); return; } }
+  const h = [hx, hy];
+  if (gs.snake.some(s => s[0]===h[0]&&s[1]===h[1])) { endRound("SELF"); return; }
+  const ate = h[0]===gs.food[0] && h[1]===gs.food[1];
+  const ns  = [h, ...gs.snake];
+  if (!ate) ns.pop();
+  gs.snake = ns; gs.dir = gs.nd;
+  if (ate) {
+    gs.score += 10; gs.foodEaten++;
+    gs.food = randFood(ns);
+    document.getElementById("disp-score").textContent = gs.score;
+    if (gs.mode==="hard") {
+      gs.bitesThisLevel++;
+      document.getElementById("disp-bites").textContent = gs.bitesThisLevel+"/"+HARD_BITES_PER_LEVEL;
+      if (gs.bitesThisLevel >= HARD_BITES_PER_LEVEL) {
+        gs.speedLevel++; gs.bitesThisLevel = 0;
+        document.getElementById("disp-speed").textContent = gs.speedLevel;
+        document.getElementById("disp-bites").textContent = "0/"+HARD_BITES_PER_LEVEL;
+      }
+    }
+    restartGameLoop();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════════════════════════════════
+function drawRR(x, y, w, h, r) {
+  r = Math.min(r, w/2, h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);     ctx.quadraticCurveTo(x+w, y,   x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);   ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);     ctx.quadraticCurveTo(x,   y+h, x,     y+h-r);
+  ctx.lineTo(x, y+r);       ctx.quadraticCurveTo(x,   y,   x+r,   y);
+  ctx.closePath();
+}
+function drawFrame() {
+  if (!gs) return;
+  const isHard = gs.mode === "hard";
+  ctx.fillStyle = isHard ? "#faf4f4" : "#f0f7f2";
+  ctx.fillRect(0, 0, CW, CW);
+  for (let x=0; x<GRID; x++) for (let y=0; y<GRID; y++) {
+    if ((x+y)%2===0) { ctx.fillStyle=isHard?"#f5eaea":"#e5f0e8"; ctx.fillRect(x*CELL, y*CELL, CELL, CELL); }
+  }
+  ctx.strokeStyle=isHard?"#d4b8b8":"#b0ccba"; ctx.lineWidth=1;
+  for (let i=0; i<=GRID; i++) {
+    ctx.beginPath(); ctx.moveTo(i*CELL,0);    ctx.lineTo(i*CELL,CW); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,i*CELL);    ctx.lineTo(CW,i*CELL); ctx.stroke();
+  }
+  ctx.strokeStyle=isHard?"#8b1a1a":"#7aaa8a"; ctx.lineWidth=isHard?5:3;
+  ctx.strokeRect(2,2,CW-4,CW-4);
+  if (isHard && gs.started && gs.alive) {
+    const head=gs.snake[0];
+    const edgeDist=Math.min(head[0],GRID-1-head[0],head[1],GRID-1-head[1]);
+    if (edgeDist<=2) { ctx.fillStyle=`rgba(139,26,26,${0.08+(2-edgeDist)*0.1})`; ctx.fillRect(0,0,CW,CW); }
+  }
+  const pulse=0.5+0.5*Math.sin(Date.now()/200);
+  const fr=CELL/2-4+pulse*2.5, fx=gs.food[0]*CELL+CELL/2, fy=gs.food[1]*CELL+CELL/2;
+  ctx.fillStyle="rgba(200,40,55,0.2)"; ctx.beginPath(); ctx.arc(fx,fy,fr+4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle="#dd2a40";              ctx.beginPath(); ctx.arc(fx,fy,fr,0,Math.PI*2);   ctx.fill();
+  ctx.fillStyle="rgba(255,255,255,0.55)"; ctx.beginPath(); ctx.arc(fx-fr*0.3,fy-fr*0.3,fr*0.36,0,Math.PI*2); ctx.fill();
+  for (let i=gs.snake.length-1; i>=0; i--) {
+    const seg=gs.snake[i], isH=i===0, ratio=1-i/gs.snake.length;
+    const px=seg[0]*CELL+2, py=seg[1]*CELL+2, sz=CELL-4, rad=isH?7:5;
+    ctx.fillStyle="rgba(0,80,20,0.18)"; drawRR(px+1,py+2,sz,sz,rad); ctx.fill();
+    if (isH) { ctx.fillStyle=isHard?"#cc2200":"#18c04a"; }
+    else {
+      const g=Math.round(148+ratio*95), b=Math.round(20+ratio*40);
+      ctx.fillStyle=isHard?`rgb(${Math.round(160+ratio*60)},${Math.round(20+ratio*20)},10)`:`rgb(10,${g},${b})`;
+    }
+    drawRR(px,py,sz,sz,rad); ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,0.26)"; drawRR(px+3,py+3,sz-6,Math.max(4,Math.round(sz*0.36)),rad-2); ctx.fill();
+    if (isH) {
+      const d=gs.dir, eyeY=py+7;
+      const e1x=(d==="RIGHT")?px+sz-9:px+4, e2x=(d==="LEFT")?px+4:(d==="RIGHT")?px+sz-9:px+sz-9;
+      ctx.fillStyle="#220000";
+      ctx.beginPath(); ctx.arc(e1x,eyeY,3.5,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e2x,eyeY,3.5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#fff";
+      ctx.beginPath(); ctx.arc(e1x+1,eyeY-1,1.4,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(e2x+1,eyeY-1,1.4,0,Math.PI*2); ctx.fill();
+    }
+  }
+  if (!gs.started && gs.alive) {
+    ctx.fillStyle=isHard?"rgba(250,244,244,0.91)":"rgba(240,247,242,0.91)"; ctx.fillRect(0,0,CW,CW);
+    ctx.fillStyle=isHard?"#8b1a1a":"#1a5a2a"; ctx.font="bold 18px monospace"; ctx.textAlign="center";
+    ctx.fillText("PRESS ANY ARROW KEY TO START",CW/2,CW/2-22);
+    ctx.fillStyle=isHard?"#aa4444":"#6a9a7a"; ctx.font="13px monospace";
+    if (isHard) {
+      ctx.fillText("HARD MODE: WALLS KILL · SPEEDS UP EVERY 10 BITES",CW/2,CW/2+6);
+      ctx.fillText("NO TIME LIMIT — HOW FAR CAN YOU GO?",CW/2,CW/2+26);
+    } else {
+      ctx.fillText("EASY MODE: WALLS WRAP · 2-MINUTE ROUND",CW/2,CW/2+6);
+      ctx.fillText("SCORE AS MUCH AS YOU CAN!",CW/2,CW/2+26);
+    }
+    ctx.textAlign="left";
+  }
+  updateTimerBar();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HUD
+// ═══════════════════════════════════════════════════════════════════════
+function updateTimeDisp() {
+  if (!gs) return;
+  const m=Math.floor(gs.timeLeft/60), s=gs.timeLeft%60;
+  const el=document.getElementById("disp-time");
+  el.textContent=m+":"+(s<10?"0"+s:s);
+  el.style.color=gs.timeLeft<=10?"#c0293a":gs.timeLeft<=30?"#a07800":"#2255cc";
+}
+function updateTimerBar() {
+  if (!gs||gs.mode==="hard") return;
+  const pct=(gs.timeLeft/ROUND_SEC)*100;
+  const bar=document.getElementById("timer-bar");
+  bar.style.width=pct+"%";
+  bar.style.background=pct<=8?"#c0293a":pct<=25?"#cc9900":"#2a7a4a";
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════════════════════════════
+function move(dir) {
+  if (currentScreen!=="game"||!gs) return;
+  if (!gs.started) { gs.started=true; gs.nd=dir; beginLoops(); return; }
+  if (OPP[dir]===gs.dir) return;
+  gs.nd=dir;
+}
+window.addEventListener("keydown", function(e) {
+  if (currentScreen!=="game") return;
+  if (e.key==="Escape") { stopLoops(); goEntry(); return; }
+  const map={ArrowUp:"UP",ArrowDown:"DOWN",ArrowLeft:"LEFT",ArrowRight:"RIGHT",
+             w:"UP",W:"UP",s:"DOWN",S:"DOWN",a:"LEFT",A:"LEFT",d:"RIGHT",D:"RIGHT"};
+  const dir=map[e.key]; if (!dir) return;
+  e.preventDefault(); move(dir);
+});
+let tStart=null;
+canvas.addEventListener("touchstart",e=>{tStart=[e.touches[0].clientX,e.touches[0].clientY];},{passive:true});
+canvas.addEventListener("touchend",e=>{
+  if (!tStart) return;
+  const dx=e.changedTouches[0].clientX-tStart[0], dy=e.changedTouches[0].clientY-tStart[1];
+  if (Math.abs(dx)<10&&Math.abs(dy)<10){tStart=null;return;}
+  move(Math.abs(dx)>Math.abs(dy)?(dx>0?"RIGHT":"LEFT"):(dy>0?"DOWN":"UP"));
+  tStart=null;
+},{passive:true});
+
+// ═══════════════════════════════════════════════════════════════════════
+// LEADERBOARD RENDERING
+// ═══════════════════════════════════════════════════════════════════════
+function rankDisplay(i) {
+  if(i===0) return '<span class="rank-gold">&#x1F451;</span>';
+  if(i===1) return '<span class="rank-silver">&#x1F948;</span>';
+  if(i===2) return '<span class="rank-bronze">&#x1F949;</span>';
+  return '<span class="rank-num">'+(i+1)+'</span>';
+}
+function renderTable(mode, bodyId, emptyId, hlName, justScored) {
+  const list=db[mode], tbody=document.getElementById(bodyId), empty=document.getElementById(emptyId);
+  const meClass=mode==="hard"?"me-hard":"me";
+  if (!list||list.length===0) { tbody.innerHTML=""; empty.style.display="block"; return; }
+  empty.style.display="none";
+  tbody.innerHTML=list.map((e,i)=>{
+    const me=e.name.toLowerCase()===(hlName||"").toLowerCase();
+    const isNew=me&&justScored!==undefined&&e.last===justScored;
+    const nameCol=me
+      ?`<strong style="color:${mode==="hard"?"#8b1a1a":"#1a5a2a"}">${e.name}</strong><span style="font-size:9px;color:#6a9a7a;margin-left:4px;">YOU</span>`
+      :`<span style="color:#334433">${e.name}</span>`;
+    return`<tr class="${isNew?"new-entry":me?meClass:""}">
+      <td>${rankDisplay(i)}</td><td>${nameCol}</td>
+      <td class="r" style="color:${mode==="hard"?"#8b1a1a":"#1a5a2a"};font-weight:bold;">${e.last}</td>
+      <td class="r" style="color:#6a9a7a;">${e.games}</td>
+      <td class="r" style="color:#a07800;font-weight:bold;">${e.best}</td>
+      <td class="r" style="color:#aaccbb;font-size:11px;">${e.lastDate||""}</td>
+    </tr>`;
+  }).join("");
+}
+function renderBothTabs(eBody,eEmpty,hBody,hEmpty) {
+  const sc=gs?gs.score:undefined;
+  renderTable("easy",eBody,eEmpty,playerName,sc);
+  renderTable("hard",hBody,hEmpty,playerName,sc);
+}
+let activeTab="easy";
+function switchTab(mode) {
+  activeTab=mode;
+  document.getElementById("lb-easy-panel").style.display=mode==="easy"?"":"none";
+  document.getElementById("lb-hard-panel").style.display=mode==="hard"?"":"none";
+  document.getElementById("tab-easy").classList.toggle("active",mode==="easy");
+  document.getElementById("tab-hard").classList.toggle("active",mode==="hard");
+}
+function switchStandaloneTab(mode) {
+  document.getElementById("slb-easy-panel").style.display=mode==="easy"?"":"none";
+  document.getElementById("slb-hard-panel").style.display=mode==="hard"?"":"none";
+  document.getElementById("stab-easy").classList.toggle("active",mode==="easy");
+  document.getElementById("stab-hard").classList.toggle("active",mode==="hard");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════════════════════════
+function replay()  { startGame(); }
+function goEntry() { stopLoops(); showScreen("entry"); document.getElementById("name-input").value=playerName; }
+function showStandaloneLb() {
+  renderTable("easy","slb-easy-body","slb-easy-empty",playerName,undefined);
+  renderTable("hard","slb-hard-body","slb-hard-empty",playerName,undefined);
+  switchStandaloneTab(selectedMode);
+  showScreen("lb");
+}
+function clearLb() {
+  if (!confirm("Clear ALL scores from this device?")) return;
+  db={easy:[],hard:[]}; dbSave();
+  renderBothTabs("lb-easy-body","lb-easy-empty","lb-hard-body","lb-hard-empty");
+  renderTable("easy","slb-easy-body","slb-easy-empty",null,null);
+  renderTable("hard","slb-hard-body","slb-hard-empty",null,null);
+  document.getElementById("lb-btn-entry").style.display="none";
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SERVICE WORKER REGISTRATION (PWA offline support)
+// ═══════════════════════════════════════════════════════════════════════
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════
+dbLoad();
+if (db.easy.length>0 || db.hard.length>0) document.getElementById("lb-btn-entry").style.display="block";
+document.getElementById("name-input").addEventListener("keydown",e=>{if(e.key==="Enter")doStart();});
+selectMode("easy");
+</script>
+</body>
+</html>
